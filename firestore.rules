@@ -1,0 +1,111 @@
+rules_version = '2';
+
+// CareSync has no custom backend: these rules ARE the server-side security layer.
+// Every read and write is checked here, whatever the client code does.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- helpers ----------
+    function signedIn() {
+      return request.auth != null;
+    }
+    function staffPath() {
+      return /databases/$(database)/documents/staff/$(request.auth.uid);
+    }
+    function isStaff() {
+      return signedIn() && exists(staffPath());
+    }
+    function isDoctor() {
+      return isStaff() && get(staffPath()).data.role == 'doctor';
+    }
+    function text(v, min, max) {
+      return v is string && v.size() >= min && v.size() <= max;
+    }
+    function num(v, min, max) {
+      return v is number && v >= min && v <= max;
+    }
+
+    // ---------- staff profiles ----------
+    match /staff/{uid} {
+      allow read: if isStaff();
+      // You can only create your own profile, with an allowed role and your verified sign-in email
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['name', 'email', 'role', 'createdAt'])
+        && text(request.resource.data.name, 2, 80)
+        && request.resource.data.role in ['doctor', 'nurse']
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.createdAt == request.time;
+      // Role can never be changed from the client
+      allow update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
+        && text(request.resource.data.name, 2, 80);
+      allow delete: if false;
+    }
+
+    // ---------- patients ----------
+    function validPatient(d) {
+      return text(d.name, 2, 100)
+        && d.dob is string && d.dob.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && d.sex in ['female', 'male', 'other']
+        && text(d.phone, 10, 15)
+        && d.bloodGroup in ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'unknown']
+        && d.allergies is list && d.allergies.size() <= 20
+        && d.conditions is list && d.conditions.size() <= 20
+        && d.primaryDoctorId is string
+        && exists(/databases/$(database)/documents/staff/$(d.primaryDoctorId));
+    }
+
+    match /patients/{patientId} {
+      allow read: if isStaff();
+      allow create: if isStaff() && validPatient(request.resource.data)
+        && request.resource.data.createdAt == request.time;
+      allow update: if isStaff() && validPatient(request.resource.data)
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isDoctor();
+
+      // Vital signs are clinical records: append-only, attributed to the signed-in staff member
+      match /vitals/{vitalId} {
+        allow read: if isStaff();
+        allow create: if isStaff()
+          && request.resource.data.recordedBy == request.auth.uid
+          && request.resource.data.recordedAt == request.time
+          && num(request.resource.data.systolic, 50, 260)
+          && num(request.resource.data.diastolic, 30, 160)
+          && num(request.resource.data.heartRate, 20, 250)
+          && num(request.resource.data.temperature, 30, 44)
+          && num(request.resource.data.spo2, 50, 100)
+          && request.resource.data.status in ['normal', 'watch', 'critical'];
+        allow update: if false;
+        allow delete: if isDoctor();
+      }
+
+      // Care-team chat about this patient: anyone on staff can read and post; nobody can edit history
+      match /messages/{messageId} {
+        allow read: if isStaff();
+        allow create: if isStaff()
+          && request.resource.data.authorId == request.auth.uid
+          && text(request.resource.data.text, 1, 2000)
+          && request.resource.data.createdAt == request.time;
+        allow update, delete: if false;
+      }
+    }
+
+    // ---------- appointments ----------
+    match /appointments/{appointmentId} {
+      allow read: if isStaff();
+      allow create: if isStaff()
+        && request.resource.data.status == 'scheduled'
+        && request.resource.data.start is timestamp
+        && request.resource.data.durationMin in [15, 30, 45, 60]
+        && text(request.resource.data.reason, 2, 200)
+        && exists(/databases/$(database)/documents/patients/$(request.resource.data.patientId))
+        && exists(/databases/$(database)/documents/staff/$(request.resource.data.doctorId))
+        && request.resource.data.createdBy == request.auth.uid;
+      // Only the status can change after booking
+      allow update: if isStaff()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+        && request.resource.data.status in ['scheduled', 'checked-in', 'completed', 'cancelled', 'no-show'];
+      allow delete: if isDoctor();
+    }
+  }
+}
