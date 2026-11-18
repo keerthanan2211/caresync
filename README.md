@@ -1,16 +1,14 @@
 # CareSync
 
+[![CI](https://github.com/keerthanan2211/caresync/actions/workflows/ci.yml/badge.svg)](https://github.com/keerthanan2211/caresync/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 A clinic care-coordination dashboard for doctors and nurses. Keep patient records, log vital signs that are automatically flagged when out of range, track trends, book appointments without double-booking, and discuss each patient in a real-time care-team chat.
 
 **Stack:** Next.js 14 · TypeScript · Tailwind CSS · Firebase Authentication · Cloud Firestore (real-time) · Firestore Security Rules · React Hook Form + Zod · Zustand · Vitest
 
-> **Live demo:** _add your deployed URL here_
-> **Demo logins:** `dr.rao@caresync.dev` (doctor) or `nurse.priya@caresync.dev` (nurse), password `Care#2026`
+**Demo accounts** (created by the seed script): `dr.rao@caresync.dev` (doctor) or `nurse.priya@caresync.dev` (nurse), password `Care#2026`
 
-<!-- Add screenshots after you run the app -->
-<!-- ![Patient view](docs/screenshots/patient.png) -->
-
-> CareSync is a portfolio project. Its vital-sign thresholds are simplified for demonstration and are not clinical guidance.
+> **Note:** vital-sign thresholds are simplified for demonstration and are not clinical guidance.
 
 ---
 
@@ -149,7 +147,7 @@ The app runs fully on the **Firebase Emulator Suite**: no Firebase account, bill
 **Prerequisites:** Node.js 20+ and Java 11+ (the Firestore emulator runs on Java).
 
 ```bash
-git clone https://github.com/<your-username>/caresync.git
+git clone https://github.com/keerthanan2211/caresync.git
 cd caresync
 npm install
 cp .env.example .env.local
