@@ -9,7 +9,7 @@
     "start": "next start -p 3000",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --dir src",
+    "test": "vitest run",
     "test:rules": "firebase emulators:exec --only firestore --project demo-caresync \"vitest run --config vitest.rules.config.ts\"",
     "emulators": "firebase emulators:start --project demo-caresync",
     "seed": "node scripts/seed.mjs"
